@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Combobox } from 'bits-ui';
-	import { onDestroy, onMount } from 'svelte';
+	import { onDestroy, onMount, tick } from 'svelte';
 	import { engineState } from '$lib/stores/engine.svelte';
 	import { fetchSuggestions } from '$lib/utils/autocomplete';
 	import { debounce } from '$lib/utils/debounce';
@@ -111,7 +111,8 @@
 		if (highlightedValue === suggestion) highlightedValue = null;
 	}
 
-	onMount(() => {
+	onMount(async () => {
+		await tick();
 		inputEl?.focus();
 	});
 
