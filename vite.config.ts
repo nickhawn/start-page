@@ -17,6 +17,9 @@ export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
 	server: { proxy: autocompleteProxy },
 	preview: { proxy: autocompleteProxy },
+	resolve: (globalThis as { process?: { env?: { VITEST?: string } } }).process?.env?.VITEST
+		? { conditions: ['browser'] }
+		: undefined,
 	test: {
 		globals: true,
 		environment: 'jsdom',
