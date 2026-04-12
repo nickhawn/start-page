@@ -19,6 +19,8 @@
 		justify-content: center;
 		padding: 2rem 1.5rem;
 		overflow: hidden;
-		background-color: var(--color-bg-page);
+		background:
+			radial-gradient(ellipse 60% 50% at 50% 45%, oklch(0.85 0.08 35 / 0.28) 0%, transparent 70%),
+			var(--color-bg-page);
 	}
 </style>
