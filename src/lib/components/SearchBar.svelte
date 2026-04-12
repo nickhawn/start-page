@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Combobox } from 'bits-ui';
-	import { onDestroy, onMount, tick } from 'svelte';
+	import { onDestroy, onMount } from 'svelte';
 	import EngineLogo from './EngineLogo.svelte';
 	import SuggestionIcon from './SuggestionIcon.svelte';
 	import { engineState } from '$lib/stores/engine.svelte';
@@ -226,10 +226,16 @@
 		removeById(item.id);
 	}
 
-	onMount(async () => {
+	onMount(() => {
 		historyState.hydrate();
-		await tick();
-		inputEl?.focus();
+	});
+
+	let didAutofocus = false;
+	$effect(() => {
+		if (inputEl && !didAutofocus) {
+			didAutofocus = true;
+			inputEl.focus();
+		}
 	});
 
 	onDestroy(() => {
