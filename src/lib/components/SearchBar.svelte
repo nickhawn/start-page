@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Combobox } from 'bits-ui';
 	import { onDestroy, onMount, tick } from 'svelte';
+	import EngineLogo from './EngineLogo.svelte';
 	import SuggestionIcon from './SuggestionIcon.svelte';
 	import { engineState } from '$lib/stores/engine.svelte';
 	import { historyState } from '$lib/stores/history.svelte';
@@ -32,7 +33,6 @@
 	let clearArmedTimer: ReturnType<typeof setTimeout> | undefined;
 
 	const queryIsUrl = $derived(isUrlLike(query));
-	const buttonLabel = $derived(queryIsUrl ? 'Go' : engineState.current.name);
 	const placeholder = $derived(
 		historyState.paused ? 'Search the web… (paused)' : 'Search the web…'
 	);
@@ -277,9 +277,17 @@
 				aria-label="Search"
 			/>
 
-			<button type="button" class="engine-button" onclick={() => navigate(query)}>
-				{buttonLabel}
-				<span class="kbd-inline">↵</span>
+			<button
+				type="button"
+				class="engine-button"
+				onclick={() => navigate(query)}
+				aria-label={queryIsUrl ? 'Go' : `Search with ${engineState.current.name}`}
+			>
+				{#if queryIsUrl}
+					<span>Go</span>
+				{:else}
+					<EngineLogo id={engineState.current.id} />
+				{/if}
 			</button>
 		</div>
 
@@ -427,9 +435,7 @@
 		display: inline-flex;
 		align-items: center;
 		justify-content: center;
-		gap: 0.375rem;
-		padding: 0.5rem 1rem;
-		min-width: 7.25rem;
+		padding: 0.5rem 0.875rem;
 		border-radius: var(--radius-pill);
 		background: var(--color-accent);
 		color: white;
@@ -453,13 +459,6 @@
 
 	.engine-button:active {
 		transform: translateY(0) scale(0.97);
-	}
-
-	.kbd-inline {
-		font-family: ui-monospace, SFMono-Regular, monospace;
-		font-size: 0.8125rem;
-		opacity: 0.9;
-		margin-left: 0.125rem;
 	}
 
 	:global(.suggestions) {
