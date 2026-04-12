@@ -226,22 +226,29 @@
 		removeById(item.id);
 	}
 
+	function focusInput() {
+		inputEl?.focus();
+	}
+
 	onMount(() => {
 		historyState.hydrate();
+		focusInput();
+		window.addEventListener('focus', focusInput);
+		document.addEventListener('visibilitychange', focusInput);
 	});
 
-	let didAutofocus = false;
 	$effect(() => {
-		if (inputEl && !didAutofocus) {
-			didAutofocus = true;
-			inputEl.focus();
-		}
+		if (inputEl) focusInput();
 	});
 
 	onDestroy(() => {
 		cancelInflight();
 		if (toastTimer !== undefined) clearTimeout(toastTimer);
 		if (clearArmedTimer !== undefined) clearTimeout(clearArmedTimer);
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('focus', focusInput);
+			document.removeEventListener('visibilitychange', focusInput);
+		}
 	});
 </script>
 
@@ -278,6 +285,7 @@
 				onkeydown={handleKeydown}
 				{placeholder}
 				autocomplete="off"
+				autofocus
 				spellcheck="false"
 				class="search-input"
 				aria-label="Search"
