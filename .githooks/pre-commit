@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+
+pnpm test
+pnpm format
+git add -u
