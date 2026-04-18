@@ -16,7 +16,7 @@ export interface HistoryFile {
 
 export const STORAGE_KEY = 'newtab:history:v1';
 export const CURRENT_VERSION = 1;
-export const MAX_ENTRIES = 50;
+export const MAX_ENTRIES = 500;
 
 export function emptyFile(): HistoryFile {
 	return { version: CURRENT_VERSION, paused: false, entries: [] };

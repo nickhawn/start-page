@@ -245,6 +245,136 @@ describe('SearchBar', () => {
 		});
 	});
 
+	describe('keyboard selection', () => {
+		it('does not mark any suggestion as active after typing', async () => {
+			historyState.record('github', 'query');
+			historyState.record('github', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			await typeInto(getInput(), 'git');
+
+			expect(document.querySelector('.suggestion-item.is-active')).toBeNull();
+		});
+
+		it('ArrowDown replaces input text with the first suggestion and marks it active', async () => {
+			historyState.record('github', 'query');
+			historyState.record('github', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			const input = getInput();
+			await typeInto(input, 'git');
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await settle();
+
+			expect(input.value).toBe('github');
+			const active = document.querySelector('.suggestion-item.is-active');
+			expect(active).not.toBeNull();
+			expect(active?.textContent).toContain('github');
+		});
+
+		it('ArrowDown past the last suggestion stays on the last one', async () => {
+			historyState.record('alpha-1', 'query');
+			historyState.record('alpha-1', 'query');
+			historyState.record('alpha-2', 'query');
+			historyState.record('alpha-2', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			const input = getInput();
+			await typeInto(input, 'alpha');
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await settle();
+
+			const active = document.querySelector('.suggestion-item.is-active');
+			expect(active).not.toBeNull();
+			// Input should be one of the two values, not stuck in between.
+			expect(['alpha-1', 'alpha-2']).toContain(input.value);
+		});
+
+		it('ArrowUp from the first suggestion restores typed text and clears active state', async () => {
+			historyState.record('github', 'query');
+			historyState.record('github', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			const input = getInput();
+			await typeInto(input, 'git');
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await settle();
+			expect(input.value).toBe('github');
+
+			await fireEvent.keyDown(input, { key: 'ArrowUp' });
+			await settle();
+
+			expect(input.value).toBe('git');
+			expect(document.querySelector('.suggestion-item.is-active')).toBeNull();
+		});
+
+		it('ArrowUp moves up between suggestions', async () => {
+			historyState.record('alpha-1', 'query');
+			historyState.record('alpha-1', 'query');
+			historyState.record('alpha-2', 'query');
+			historyState.record('alpha-2', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			const input = getInput();
+			await typeInto(input, 'alpha');
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await settle();
+			const secondValue = input.value;
+			expect(['alpha-1', 'alpha-2']).toContain(secondValue);
+
+			await fireEvent.keyDown(input, { key: 'ArrowUp' });
+			await settle();
+			const firstValue = input.value;
+			expect(['alpha-1', 'alpha-2']).toContain(firstValue);
+			expect(firstValue).not.toBe(secondValue);
+		});
+
+		it('typing after arrow-navigation clears the active state', async () => {
+			historyState.record('github', 'query');
+			historyState.record('github', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			const input = getInput();
+			await typeInto(input, 'git');
+			await fireEvent.keyDown(input, { key: 'ArrowDown' });
+			await settle();
+			expect(document.querySelector('.suggestion-item.is-active')).not.toBeNull();
+
+			await typeInto(input, 'gith');
+
+			expect(document.querySelector('.suggestion-item.is-active')).toBeNull();
+		});
+
+		it('Enter without arrow-navigation submits the typed text even when a suggestion matches', async () => {
+			historyState.record('github', 'query');
+			historyState.record('github', 'query');
+
+			render(SearchBar);
+			await settle();
+
+			const input = getInput();
+			await typeInto(input, 'git');
+			await fireEvent.keyDown(input, { key: 'Enter' });
+
+			expect(navigatedTo).toBe(ENGINES[DEFAULT_ENGINE_INDEX].searchUrl('git'));
+		});
+	});
+
 	describe('selection and removal', () => {
 		it('navigates and leaves the entry confirmed when a suggestion is picked', async () => {
 			historyState.record('example.com', 'url');

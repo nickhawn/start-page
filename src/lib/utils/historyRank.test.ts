@@ -173,4 +173,39 @@ describe('matchEntries', () => {
 		const result = matchEntries('foo', entries, 0);
 		expect(result[0].value).toBe('foo prefix match');
 	});
+
+	it('matches url entries against their url-normalized form (strips protocol/www)', () => {
+		const entries = [
+			entry('https://staging.asi1.ai', { kind: 'url', count: 3, lastAt: 0 }),
+			entry('www.theverge.com', { kind: 'url', count: 3, lastAt: 0 })
+		];
+		expect(matchEntries('staging', entries, 0)).toHaveLength(1);
+		expect(matchEntries('theverge', entries, 0)).toHaveLength(1);
+	});
+
+	it('matches url entries against raw value when protocol is absent', () => {
+		const entries = [entry('staging.asi1.ai', { kind: 'url', count: 3, lastAt: 0 })];
+		const result = matchEntries('staging', entries, 0);
+		expect(result).toHaveLength(1);
+		expect(result[0].value).toBe('staging.asi1.ai');
+	});
+
+	it('ranks a hostname-prefix url match above a query-kind entry with higher count', () => {
+		const entries = [
+			entry('thev', { kind: 'query', count: 7, lastAt: 0 }),
+			entry('theverge.com', { kind: 'url', count: 5, lastAt: 0 })
+		];
+		const result = matchEntries('thev', entries, 0);
+		expect(result[0].value).toBe('theverge.com');
+		expect(result[1].value).toBe('thev');
+	});
+
+	it('does not apply the hostname-prefix boost to query-kind entries', () => {
+		const entries = [
+			entry('foo', { kind: 'query', count: 3, lastAt: 0 }),
+			entry('foobar', { kind: 'query', count: 3, lastAt: 0 })
+		];
+		const result = matchEntries('foo', entries, 0);
+		expect(result.map((r) => r.value).sort()).toEqual(['foo', 'foobar']);
+	});
 });

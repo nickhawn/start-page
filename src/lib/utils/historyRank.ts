@@ -1,10 +1,12 @@
 import type { HistoryEntry } from './historyStorage';
+import { urlNormalize } from './url';
 
 const DAY_MS = 86_400_000;
 
 export const DECAY_DAYS = 30;
 export const NEAR_DUP_LEV_CAP = 2;
 export const DISPLAY_LIMIT = 3;
+export const HOSTNAME_PREFIX_BOOST = 5;
 
 export function normalize(s: string): string {
 	return s.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -66,10 +68,15 @@ export function matchEntries(
 		if (!e.confirmed) continue;
 		if (rank(e, now) <= 0) continue;
 		const nv = normalize(e.value);
-		if (!nv.includes(q)) continue;
+		const uv = e.kind === 'url' ? urlNormalize(e.value) : nv;
+		if (!nv.includes(q) && !uv.includes(q)) continue;
 		const ageDays = (now - e.lastAt) / DAY_MS;
-		const prefixBoost = nv.startsWith(q) ? 1 : 0;
-		scored.push({ e, s: 2 * e.count - ageDays / DECAY_DAYS + prefixBoost });
+		const prefixBoost = nv.startsWith(q) || uv.startsWith(q) ? 1 : 0;
+		const hostnameBoost = e.kind === 'url' && uv.startsWith(q) ? HOSTNAME_PREFIX_BOOST : 0;
+		scored.push({
+			e,
+			s: 2 * e.count - ageDays / DECAY_DAYS + prefixBoost + hostnameBoost
+		});
 	}
 
 	scored.sort((a, b) => b.s - a.s);

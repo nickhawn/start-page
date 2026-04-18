@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isUrlLike, toUrl } from './url';
+import { isUrlLike, toUrl, urlNormalize } from './url';
 
 describe('isUrlLike', () => {
 	it.each([
@@ -66,5 +66,36 @@ describe('toUrl', () => {
 
 	it('is case-insensitive for protocol match', () => {
 		expect(toUrl('HTTPS://example.com')).toBe('HTTPS://example.com');
+	});
+});
+
+describe('urlNormalize', () => {
+	it('strips the http protocol', () => {
+		expect(urlNormalize('http://example.com')).toBe('example.com');
+	});
+
+	it('strips the https protocol', () => {
+		expect(urlNormalize('https://example.com')).toBe('example.com');
+	});
+
+	it('strips the www prefix', () => {
+		expect(urlNormalize('www.example.com')).toBe('example.com');
+	});
+
+	it('strips both protocol and www', () => {
+		expect(urlNormalize('https://www.example.com')).toBe('example.com');
+	});
+
+	it('strips trailing slashes', () => {
+		expect(urlNormalize('example.com/')).toBe('example.com');
+		expect(urlNormalize('example.com///')).toBe('example.com');
+	});
+
+	it('lowercases and trims', () => {
+		expect(urlNormalize('  HTTPS://Example.COM  ')).toBe('example.com');
+	});
+
+	it('leaves plain strings alone', () => {
+		expect(urlNormalize('staging.asi1.ai')).toBe('staging.asi1.ai');
 	});
 });

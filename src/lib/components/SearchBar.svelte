@@ -18,13 +18,13 @@
 	let inputEl = $state<HTMLInputElement | null>(null);
 	let shellEl = $state<HTMLDivElement | null>(null);
 
-	// Enter should use the typed query unless the user has deliberately
-	// arrow-navigated into the dropdown. `userNavigated` tracks that
-	// intent; `highlightedValue` mirrors the currently highlighted item
-	// (which bits-ui auto-sets on open — we only honour it after arrow
-	// navigation).
-	let userNavigated = $state(false);
-	let highlightedValue = $state<string | null>(null);
+	// We manage the keyboard-selection state ourselves so it's independent of
+	// bits-ui's internal highlight (which auto-selects the first candidate on
+	// every input event). `activeIndex` is null when nothing is keyboard-selected
+	// and the input shows what the user actually typed; `typedQuery` preserves
+	// that typed text so ArrowUp-past-first can restore it.
+	let activeIndex = $state<number | null>(null);
+	let typedQuery = $state('');
 
 	// Toast + Cmd+Shift+Delete confirmation state
 	let toastMessage = $state<string | null>(null);
@@ -79,11 +79,19 @@
 		}, 2000);
 	}
 
+	// bits-ui's `inputValue` prop is one-way, so the rendered input element
+	// doesn't always re-sync when we set `query` programmatically (e.g. on
+	// arrow navigation). Write both together to keep them in lock-step.
+	function syncInput(v: string) {
+		query = v;
+		if (inputEl) inputEl.value = v;
+	}
+
 	function handleInput(e: Event & { currentTarget: HTMLInputElement }) {
 		const value = e.currentTarget.value;
 		query = value;
-		userNavigated = false;
-		highlightedValue = null;
+		typedQuery = value;
+		activeIndex = null;
 
 		const hist = historyItems(value);
 		suggestions = hist;
@@ -149,8 +157,8 @@
 			!e.ctrlKey &&
 			!e.altKey
 		) {
-			if (!open || !userNavigated || highlightedValue === null) return;
-			const picked = suggestions.find((s) => s.value === highlightedValue);
+			if (!open || activeIndex === null) return;
+			const picked = suggestions[activeIndex];
 			if (!picked?.id || picked.kind === 'suggest') return;
 			e.preventDefault();
 			removeById(picked.id);
@@ -164,15 +172,43 @@
 			return;
 		}
 
-		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
-			userNavigated = true;
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			if (suggestions.length === 0) return;
+			const next = activeIndex === null ? 0 : Math.min(activeIndex + 1, suggestions.length - 1);
+			activeIndex = next;
+			syncInput(suggestions[next].value);
+			return;
+		}
+
+		if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			e.stopImmediatePropagation();
+			if (suggestions.length === 0) return;
+			if (activeIndex === null || activeIndex === 0) {
+				activeIndex = null;
+				syncInput(typedQuery);
+			} else {
+				activeIndex -= 1;
+				syncInput(suggestions[activeIndex].value);
+			}
 			return;
 		}
 
 		if (e.key === 'Enter') {
 			e.preventDefault();
-			const useHighlighted = open && userNavigated && highlightedValue !== null;
-			navigate(useHighlighted ? highlightedValue! : query);
+			e.stopImmediatePropagation();
+			if (activeIndex !== null && suggestions[activeIndex]) {
+				const item = suggestions[activeIndex];
+				if (item.id && (item.kind === 'query' || item.kind === 'url')) {
+					historyState.confirm(item.id);
+				}
+				const kind: 'query' | 'url' = item.kind === 'url' ? 'url' : 'query';
+				navigate(item.value, { fromSuggestion: true, kind });
+			} else {
+				navigate(query);
+			}
 			return;
 		}
 
@@ -181,11 +217,12 @@
 			if (open) {
 				open = false;
 				suggestions = [];
+				if (activeIndex !== null) syncInput(typedQuery);
 			} else {
-				query = '';
+				typedQuery = '';
+				syncInput('');
 			}
-			userNavigated = false;
-			highlightedValue = null;
+			activeIndex = null;
 		}
 	}
 
@@ -202,21 +239,18 @@
 		navigate(value, { fromSuggestion: true, kind });
 	}
 
-	function onItemHighlight(value: string) {
-		highlightedValue = value;
-	}
-
-	function onItemUnhighlight(value: string) {
-		if (highlightedValue === value) highlightedValue = null;
-	}
-
 	function removeById(id: string) {
+		const prevIndex = activeIndex;
 		historyState.remove(id);
 		suggestions = suggestions.filter((s) => s.id !== id);
 		if (suggestions.length === 0) {
 			open = false;
-			userNavigated = false;
-			highlightedValue = null;
+			activeIndex = null;
+			syncInput(typedQuery);
+		} else if (prevIndex !== null) {
+			const nextIndex = Math.min(prevIndex, suggestions.length - 1);
+			activeIndex = nextIndex;
+			syncInput(suggestions[nextIndex].value);
 		}
 	}
 
@@ -314,16 +348,14 @@
 					customAnchor={shellEl}
 				>
 					<Combobox.Viewport class="suggestions-viewport">
-						{#each suggestions as item (item.value + ':' + item.kind)}
+						{#each suggestions as item, i (item.value + ':' + item.kind)}
 							<Combobox.Item
 								value={item.value}
 								label={item.value}
-								class="suggestion-item"
-								onHighlight={() => onItemHighlight(item.value)}
-								onUnhighlight={() => onItemUnhighlight(item.value)}
+								class={i === activeIndex ? 'suggestion-item is-active' : 'suggestion-item'}
 							>
-								{#snippet children({ highlighted })}
-									<SuggestionIcon kind={item.kind} {highlighted} />
+								{#snippet children()}
+									<SuggestionIcon kind={item.kind} highlighted={i === activeIndex} />
 									<span class="item-label">{item.value}</span>
 									{#if item.kind !== 'suggest' && item.id}
 										<button
@@ -505,7 +537,17 @@
 		transition: background var(--duration-fast) var(--ease-out-soft);
 	}
 
+	/* bits-ui auto-highlights the first item on every input; we drive the
+	   keyboard selection ourselves via .is-active, so neutralise its style. */
 	:global(.suggestion-item[data-highlighted]) {
+		background: transparent;
+	}
+
+	:global(.suggestion-item:hover) {
+		background: color-mix(in oklch, var(--color-text-primary) 6%, transparent);
+	}
+
+	:global(.suggestion-item.is-active) {
 		background: var(--color-accent-soft);
 	}
 
@@ -552,7 +594,7 @@
 	}
 
 	:global(.suggestion-item:hover .item-delete),
-	:global(.suggestion-item[data-highlighted] .item-delete),
+	:global(.suggestion-item.is-active .item-delete),
 	:global(.item-delete:focus-visible) {
 		opacity: 1;
 	}

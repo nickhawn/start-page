@@ -169,7 +169,7 @@ describe('historyState', () => {
 	describe('capacity cap', () => {
 		// Fixed-width names so no two values are prefixes of each other — otherwise
 		// near-duplicate collapse would merge them and the cap would never trip.
-		const name = (i: number) => `item-${i.toString().padStart(2, '0')}`;
+		const name = (i: number) => `item-${i.toString().padStart(4, '0')}`;
 
 		it('evicts the lowest-rank entry once MAX_ENTRIES is exceeded', () => {
 			for (let i = 0; i < MAX_ENTRIES; i++) {
